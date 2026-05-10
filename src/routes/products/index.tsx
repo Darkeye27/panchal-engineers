@@ -5,6 +5,12 @@ import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 
 export const Route = createFileRoute("/products/")({
+  head: () => ({
+    meta: [
+      { title: "Fleet & Machinery | Panchal Engineers" },
+      { name: "description", content: "Explore our full catalog of high-performance industrial machinery, including excavators, cranes, and loaders." }
+    ]
+  }),
   component: ProductsIndex
 });
 

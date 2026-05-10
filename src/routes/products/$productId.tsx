@@ -7,6 +7,15 @@ import { MagneticButton } from "@/components/MagneticButton";
 import { useNavigate } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/products/$productId")({
+  head: ({ params }) => {
+    const product = products.find(p => p.id === params.productId);
+    return {
+      meta: [
+        { title: `${product?.name || "Product"} | Panchal Engineers` },
+        { name: "description", content: product?.shortDesc }
+      ]
+    };
+  },
   component: ProductDetail
 });
 
