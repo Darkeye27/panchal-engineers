@@ -6,44 +6,45 @@ const serverAssetsDir = path.join(serverDir, 'assets');
 const clientDir = path.join(process.cwd(), 'dist', 'client');
 const clientAssetsDir = path.join(clientDir, 'assets');
 
-console.log('Starting path-aware build fix...');
+console.log('Starting structural build fix...');
 
 try {
-  // 1. Copy all server assets to both dist/client/assets AND dist/client root
-  // This ensures relative imports like "./file.js" work.
+  // 1. Copy server.js to dist/client/server.js
+  const serverJs = path.join(serverDir, 'server.js');
+  if (fs.existsSync(serverJs)) {
+    fs.copyFileSync(serverJs, path.join(clientDir, 'server.js'));
+    console.log('Copied server.js to client root.');
+  }
+
+  // 2. Copy all server assets to dist/client/assets
   if (fs.existsSync(serverAssetsDir)) {
     const serverFiles = fs.readdirSync(serverAssetsDir);
     serverFiles.forEach(file => {
-      // Copy to assets folder (for standard web access)
       fs.copyFileSync(path.join(serverAssetsDir, file), path.join(clientAssetsDir, file));
-      // Copy to root (for worker resolution)
-      fs.copyFileSync(path.join(serverAssetsDir, file), path.join(clientDir, file));
     });
-    console.log(`Copied ${serverFiles.length} server assets to root and assets folder.`);
+    console.log(`Copied ${serverFiles.length} server assets to client/assets.`);
   }
 
-  // 2. Find and copy the worker entry
-  let workerSource = null;
+  // 3. Find the worker entry and create a PROXY _worker.js
+  let workerFilename = null;
   const serverIndexFile = path.join(serverDir, 'index.js');
   
   if (fs.existsSync(serverIndexFile)) {
     const content = fs.readFileSync(serverIndexFile, 'utf8');
-    const match = content.match(/from\s+["'](\.\/assets\/[^"']+)["']/);
-    if (match) {
-      const filename = path.basename(match[1]);
-      workerSource = path.join(serverAssetsDir, filename);
-    }
+    const match = content.match(/from\s+["']\.\/assets\/([^"']+)["']/);
+    if (match) workerFilename = match[1];
   }
 
-  if (!workerSource) {
+  if (!workerFilename) {
     const assets = fs.readdirSync(serverAssetsDir);
-    const fallback = assets.find(f => (f.startsWith('server-') || f.startsWith('worker-entry')) && f.endsWith('.js'));
-    if (fallback) workerSource = path.join(serverAssetsDir, fallback);
+    workerFilename = assets.find(f => (f.startsWith('server-') || f.startsWith('worker-entry')) && f.endsWith('.js'));
   }
 
-  if (workerSource && fs.existsSync(workerSource)) {
-    fs.copyFileSync(workerSource, path.join(clientDir, '_worker.js'));
-    console.log(`Successfully created _worker.js from ${path.basename(workerSource)}`);
+  if (workerFilename) {
+    // Create a proxy worker that preserves relative paths
+    const proxyContent = `export { default } from "./assets/${workerFilename}";\n`;
+    fs.writeFileSync(path.join(clientDir, '_worker.js'), proxyContent);
+    console.log(`Created proxy _worker.js pointing to assets/${workerFilename}`);
   } else {
     console.error('FAILED: Could not identify worker entry point.');
     process.exit(1);
