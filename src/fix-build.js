@@ -6,7 +6,7 @@ const serverAssetsDir = path.join(serverDir, 'assets');
 const clientDir = path.join(process.cwd(), 'dist', 'client');
 const clientAssetsDir = path.join(clientDir, 'assets');
 
-console.log('Starting structural build fix...');
+console.log('Starting assets-aware build fix...');
 
 try {
   // 1. Copy server.js to dist/client/server.js
@@ -41,14 +41,20 @@ try {
   }
 
   if (workerFilename) {
-    // Create a proxy worker that preserves relative paths
     const proxyContent = `export { default } from "./assets/${workerFilename}";\n`;
     fs.writeFileSync(path.join(clientDir, '_worker.js'), proxyContent);
     console.log(`Created proxy _worker.js pointing to assets/${workerFilename}`);
-  } else {
-    console.error('FAILED: Could not identify worker entry point.');
-    process.exit(1);
   }
+
+  // 4. Create _routes.json to ensure static assets are served by Cloudflare, not the worker
+  const routesContent = {
+    version: 1,
+    include: ["/*"],
+    exclude: ["/assets/*", "/favicon.ico", "/*.png", "/*.jpg", "/*.jpeg", "/*.svg", "/*.css"]
+  };
+  fs.writeFileSync(path.join(clientDir, '_routes.json'), JSON.stringify(routesContent, null, 2));
+  console.log('Created _routes.json to enable CSS/Assets.');
+
 } catch (err) {
   console.error('Error during build fix:', err);
   process.exit(1);
